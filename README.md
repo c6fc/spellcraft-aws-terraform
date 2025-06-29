@@ -3,13 +3,13 @@
 [![NPM version](https://img.shields.io/npm/v/@c6fc/spellcraft-aws-terraform.svg?style=flat)](https://www.npmjs.com/package/@c6fc/spellcraft-aws-terraform)
 [![License](https://img.shields.io/npm/l/@c6fc/spellcraft-aws-terraform.svg?style=flat)](https://opensource.org/licenses/MIT)
 
-This module exposes common constructs for using [SpellCraft](https://github.com/@c6fc/spellcraft) SpellFrames to deploy infrastructure to AWS using Terraform. This plugin allows you to natively expose authenticated AWS contexts or role-chains to your SpellFrames, and use the full power of the SDK in both JavaScript native functions and JSonnet.
+This module exposes common constructs for using [SpellCraft](https://github.com/@c6fc/spellcraft) SpellFrames to deploy infrastructure to AWS using Terraform.
 
 ```sh
 npm install --save @c6fc/spellcraft
 
-# Install and expose this module with name 'awsauth'
-npx spellcraft importModule spellcraft-aws-auth awsauth
+# Install and expose this module with name 'awsterraform'
+npx spellcraft importModule spellcraft-aws-terraform
 ```
 
 ## Features
