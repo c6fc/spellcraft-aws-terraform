@@ -1,0 +1,36 @@
+{
+  "name": "@c6fc/spellcraft-aws-terraform",
+  "version": "1.0.0",
+  "main": "module.js",
+  "scripts": {
+    "cli": "utils/cli-test.js",
+    "test": "node utils/test.js",
+    "doc": "jsdoc -c utils/jsdoc.json --verbose"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/c6fc/spellcraft-aws-terraform.git"
+  },
+  "config": {
+    "spellcraft_module_default_name": "awsterraform"
+  },
+  "author": "Brad Woodward (brad@bradwoodward.io)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/c6fc/spellcraft-aws-terraform/issues"
+  },
+  "homepage": "https://github.com/c6fc/spellcraft-aws-terraform#readme",
+  "description": "A plugin to empower @c6fc/spellcraft with AWS",
+  "devDependencies": {
+    "clean-jsdoc-theme": "^4.3.0",
+    "jsdoc": "^4.0.4",
+    "yargs": "^18.0.0"
+  },
+  "dependencies": {
+    "@c6fc/spellcraft": "^0.0.5",
+    "@c6fc/spellcraft-aws-auth": "^1.0.7",
+    "@c6fc/spellcraft-terraform": "^1.0.4",
+    "aws-sdk": "^2.1692.0",
+    "ini": "^5.0.0"
+  }
+}
