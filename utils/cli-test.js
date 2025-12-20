@@ -7,20 +7,26 @@ const path = require('path');
 const yargs = require('yargs');
 const { hideBin } = require('yargs/helpers');
 const { SpellFrame } = require('@c6fc/spellcraft');
-const { _spellcraft_metadata } = require('../module.js');
 
 const spellframe = new SpellFrame();
 
-spellframe.loadModuleByName("foo", ".."); // a name of '..' loads the current module.
-spellframe.loadModuleByName("terraform", "@c6fc/spellcraft-terraform");
+// 1. Resolve local package info to simulate a real plugin load
+const packageDir = path.resolve(__dirname, '..'); // Assuming script is in /utils
+const packageJsonPath = path.join(packageDir, 'package.json');
 
-// Raise an alert if there's a spellcraft_modules directory, since this isn't allowed for modules.
-if (fs.existsSync(path.resolve('..', 'spellcraft_modules'))) {
-	throw new Error(`[!] This module has a spellcraft_modules directory. This isn't permitted. Instead, native `
-		+ `functions should be exposed through your modules.js file. Migrate your functions and remove the `
-		+ `spellcraft_modules directory before continuing`);
+if (!fs.existsSync(packageJsonPath)) {
+    throw new Error(`[!] Could not find package.json at ${packageJsonPath}`);
 }
 
+const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+const jsEntry = path.join(packageDir, pkg.main || 'index.js');
+
+console.log(`[*] Loading local plugin context: ${pkg.name}`);
+
+// 2. Load the plugin into SpellFrame
+// This registers native functions (namespaced) and populates cliExtensions 
+// automatically via the _spellcraft_metadata export in module.js
+spellframe.loadPlugin(pkg.name, jsEntry);
 
 (async () => {
 	
@@ -35,7 +41,7 @@ if (fs.existsSync(path.resolve('..', 'spellcraft_modules'))) {
 				demandOption: true,
 			});
 		},
-		async (argv) => { // No JSDoc for internal handler
+		async (argv) => { 
 			try {
 				await spellframe.init();
 				console.log(`[+] Rendering configuration from: ${argv.filename}`);
@@ -46,9 +52,10 @@ if (fs.existsSync(path.resolve('..', 'spellcraft_modules'))) {
 				console.error(`[!] Error during generation: ${error.message}`);
 				process.exit(1);
 			}
-		})
+		});
 
-	// No JSDoc for CLI extensions loop if considered internal detail
+	// 3. Register CLI extensions found in the loaded plugin
+    // These were populated by loadPlugin() reading _spellcraft_metadata
 	if (spellframe.cliExtensions && spellframe.cliExtensions.length > 0) {
 		spellframe.cliExtensions.forEach((extensionFn) => {
 			if (typeof extensionFn === 'function') {

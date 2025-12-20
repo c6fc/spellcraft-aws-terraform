@@ -1,9 +1,3 @@
-/**
- * @module spellcraft-aws-terraform
- * @description This module represents the JSonnet and JavaScript native
- * functions exposed by this plugin.
- */
-
 // Don't try to 'import' your spellcraft native functions here.
 // Use std.native(function)(..args) instead
 
@@ -16,14 +10,14 @@
 	 * returns a 'backend' object referencing this bucket and a unique path
 	 * for this project's state and artifacts.
 	 *
-	 * @function bootstrapTerraformInAWS
 	 * @param {string} project
-	 * @memberof module:spellcraft-aws-terraform
 	 * @returns {object} backend
 	 * @example
-	 * local awsterraform = import "awsterraform.libsonnet";
-	 * awsterraform.bootstrapTerraformInAWS("myBootstrapTest");
+	 * local aws = import "@c6fc/spellcraft-aws-terraform";
 	 *
+	 * aws.bootstrap("myBootstrapTest");
+	 *
+	 * // Returns:
 	 * {
 	 *    "terraform": {
 	 *        "backend": {
@@ -36,85 +30,89 @@
 	 *    }
 	 * }
 	 */
-	bootstrapTerraformInAWS(project):: std.native("bootstrapTerraformInAWS")(project),
+	bootstrap(project):: std.native("@c6fc/spellcraft-aws-terraform:bootstrap")(project),
 
 	/**
 	 * Obtains the contents of a named artifact stored alongside this project in the bootstrap
-	 * bucket. This artifact is created with 'putTerraformInAWSArtifact';
+	 * bucket. This artifact is created with 'putArtifact';
 	 *
-	 * @function getTerraformInAWSArtifact
 	 * @param {string} name
-	 * @memberof module:spellcraft-aws-terraform
 	 * @returns {object} backend
 	 * @example
-	 * local awsterraform = import "awsterraform.libsonnet";
-	 * awsterraform.getTerraformInAWSArtifact("myArtifact");
+	 * local aws = import "@c6fc/spellcraft-aws-terraform";
 	 *
+	 * aws.getArtifact("myArtifact");
+	 *
+	 * // Returns:
 	 * <contents of your artifact>
 	 */
-	getTerraformInAWSArtifact(name):: std.native("getTerraformInAWSArtifact")(name),
+	getArtifact(name):: std.native("@c6fc/spellcraft-aws-terraform:getArtifact")(name),
 
 	/**
-	 * Attempts to discover the bucket created through bootstrapTerraformInAWS(), returning the
+	 * Attempts to discover the bucket created through bootstrap(), returning the
 	 * bucket ARN if present.
 	 *
-	 * @function getTerraformInAWSBootstrapBucket
-	 * @memberof module:spellcraft-aws-terraform
 	 * @returns {string} bucketArn
 	 * @example
-	 * local awsterraform = import "awsterraform.libsonnet";
-	 * awsterraform.bootstrapTerraformInAWS("myProject");
-	 * awsterraform.getTerraformInAWSBootstrapBucket();
+	 * local aws = import "@c6fc/spellcraft-aws-terraform";
 	 *
+	 * aws.getBootstrapBucket();
+	 *
+	 * // Returns:
 	 * arn:aws:s3:::spellcraft-random-0123456789
 	 */
-	getTerraformInAWSBootstrapBucket():: std.native("getTerraformInAWSBootstrapBucket")(),
+	getBootstrapBucket():: std.native("@c6fc/spellcraft-aws-terraform:getBootstrapBucket")(),
 
 	/**
 	 * Read the Terraform state for an adjacent SpellCraft project in the same AWS account
 	 *
-	 * @function getTerraformInAWSRemoteState
 	 * @param {string} project
-	 * @memberof module:spellcraft-aws-terraform
 	 * @returns {object} state
 	 * @example
-	 * local awsterraform = import "awsterraform.libsonnet";
-	 * awsterraform.getTerraformInAWSRemoteState("mySecondProject");
+	 * local aws = import "@c6fc/spellcraft-aws-terraform";
 	 *
+	 * aws.getRemoteState("mySecondProject");
+	 *
+	 * // Returns:
 	 * { full remote state object }
 	 */
-	getTerraformInAWSRemoteState(project):: std.native("getTerraformInAWSRemoteState")(project),
+	getRemoteState(project):: std.native("@c6fc/spellcraft-aws-terraform:getRemoteState")(project),
 
 	/**
 	 * Stores the JSON-encoded balue of 'contents' as a file in the S3 backend bucket using
 	 * the project prefix.
 	 *
-	 * @function putTerraformInAWSArtifact
 	 * @param {string} name
 	 * @param {*} contents
-	 * @memberof module:spellcraft-aws-terraform
 	 * @returns {boolean} true
 	 * @example
-	 * local awsterraform = import "awsterraform.libsonnet";
-	 * awsterraform.putTerraformInAWSArtifact("myArtifact", { someData: someValue });
+	 * local aws = import "@c6fc/spellcraft-aws-terraform";
 	 *
+	 * aws.putArtifact("myArtifact", { someData: someValue });
+	 *
+	 * // Returns:
 	 * true
 	 */
-	putTerraformInAWSArtifact(name, content):: std.native("putTerraformInAWSArtifact")(name, content),
+	putArtifact(name, content):: std.native("@c6fc/spellcraft-aws-terraform:putArtifact")(name, content),
 
 	/**
 	 * Stores the JSON-encoded balue of 'contents' as a file in the S3 backend bucket using
 	 * the project prefix.
 	 *
-	 * @function providerAliases
 	 * @param {string} default
-	 * @memberof module:spellcraft-aws-terraform
 	 * @returns {object} terraformProviderConfig
 	 * @example
-	 * local awsterraform = import "awsterraform.libsonnet";
-	 * awsterraform.providerAliases("us-east-2");
+	 * local aws = import "@c6fc/spellcraft-aws-terraform";
 	 *
-	 * true
+	 * aws.providerAliases("us-east-2");
+	 *
+	 * // Returns:
+	 * [{ aws: {
+	 *		region: "us-east-2"
+	 * }}, { aws: {
+	 *		region: "us-east-1",
+			alias: "aws.us-east-1"
+	 * }}, ...]
 	 */
 	providerAliases(default):: [{
 		aws: {
@@ -123,7 +121,7 @@
 		}
 	} for region in std.map(
 		function(x) x.RegionName,
-		std.native("aws")('{ "service": "EC2", "params": { "region": "us-east-1" } }', "describeRegions", "{}").Regions
+		std.native("@c6fc/spellcraft-aws-auth:aws")('{ "service": "EC2", "params": { "region": "us-east-1" } }', "describeRegions", "{}").Regions
 	)] + [{
 		aws: {
 			region: default

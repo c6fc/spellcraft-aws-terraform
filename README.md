@@ -6,19 +6,16 @@
 This module exposes common constructs for using [SpellCraft](https://github.com/@c6fc/spellcraft) SpellFrames to deploy infrastructure to AWS using Terraform.
 
 ```sh
-npm install --save @c6fc/spellcraft
-
-# Install and expose this module with name 'awsterraform'
-npx spellcraft importModule spellcraft-aws-terraform
+npm install --save @c6fc/spellcraft-aws-terraform
 ```
 
 ## Features
 
 This module exposes the concept of a bootstrap bucket (functionally a terraform backend), and artifacts which can contain arbitrary data and are stored alongside the terraform state in the bootstrap bucket. The former allows for dynamic configuration of Terraform providers within different environments, while the latter simplifies the storage and use of dynamic configuration details that might be environment dependent.
 
-## CLI Commands
+<!-- SPELLCRAFT_DOCS_CLI_START -->
 
-This plugin does not extend the SpellCraft CLI.
+<!-- SPELLCRAFT_DOCS_CLI_END -->
 
 ## SpellFrame 'init()' features
 
@@ -30,28 +27,152 @@ Extends the JavaScript function context with an `awsterraform` object containing
 
 ```JSON
 { 
-	"projectName": "<contains the name of the project specified by bootstrapTerraformInAWS()>",
+	"projectName": "<contains the name of the project specified by bootstrap()>",
 	"bootstrapBucket": "<contains the ARN for the bootstrap bucket>",
 	"bootstrapLocation": "<contains the region where the bootstrap bucket is located>"
 }
 ```
 
-## Exposed module functions
+<!-- SPELLCRAFT_DOCS_API_START -->
+## API Reference
 
-Exposes the following functions to JSonnet through the import module:
+### `bootstrap(project)`
 
-*	`bootstrapTerraformInAWS(project)`
-*	`getTerraformInAWSArtifact(name)`
-*	`getTerraformInAWSBootstrapBucket()`
-*	`getTerraformInAWSRemoteState(project)`
-*	`putTerraformInAWSArtifact(name, content)`
+Creates a Terraform backend bucket if one doesn't already exist, then
+returns a 'backend' object referencing this bucket and a unique path
+for this project's state and artifacts.
 
-As well as the following helper functions that other AWS-based modules expect
+- param {string} project
+- returns {object} backend
 
-*	`providerAliases(default)`
+**Examples:**
 
+```jsonnet
+local aws = import "@c6fc/spellcraft-aws-terraform";
 
-Generate documentation with `npm run doc` to see more detailed information about how to use these features.
+aws.bootstrap("myBootstrapTest");
+
+// Returns:
+{
+   "terraform": {
+       "backend": {
+           "s3": {
+               "bucket": "spellcraft-random-0123456789",
+               "key": "spellcraft/myBootstrapTest/terraform.tfstate",
+               "region": "us-east-1"
+           }
+       }
+   }
+}
+```
+
+---
+### `getArtifact(name)`
+
+Obtains the contents of a named artifact stored alongside this project in the bootstrap
+bucket. This artifact is created with 'putArtifact';
+
+- param {string} name
+- returns {object} backend
+
+**Examples:**
+
+```jsonnet
+local aws = import "@c6fc/spellcraft-aws-terraform";
+
+aws.getArtifact("myArtifact");
+
+// Returns:
+<contents of your artifact>
+```
+
+---
+### `getBootstrapBucket()`
+
+Attempts to discover the bucket created through bootstrap(), returning the
+bucket ARN if present.
+
+- returns {string} bucketArn
+
+**Examples:**
+
+```jsonnet
+local aws = import "@c6fc/spellcraft-aws-terraform";
+
+aws.getBootstrapBucket();
+
+// Returns:
+arn:aws:s3:::spellcraft-random-0123456789
+```
+
+---
+### `getRemoteState(project)`
+
+Read the Terraform state for an adjacent SpellCraft project in the same AWS account
+
+- param {string} project
+- returns {object} state
+
+**Examples:**
+
+```jsonnet
+local aws = import "@c6fc/spellcraft-aws-terraform";
+
+aws.getRemoteState("mySecondProject");
+
+// Returns:
+{ full remote state object }
+```
+
+---
+### `putArtifact(name, content)`
+
+Stores the JSON-encoded balue of 'contents' as a file in the S3 backend bucket using
+the project prefix.
+
+- param {string} name
+- param {*} contents
+- returns {boolean} true
+
+**Examples:**
+
+```jsonnet
+local aws = import "@c6fc/spellcraft-aws-terraform";
+
+aws.putArtifact("myArtifact", { someData: someValue });
+
+// Returns:
+true
+```
+
+---
+### `providerAliases(default)`
+
+Stores the JSON-encoded balue of 'contents' as a file in the S3 backend bucket using
+the project prefix.
+
+- param {string} default
+- returns {object} terraformProviderConfig
+
+**Examples:**
+
+```jsonnet
+local aws = import "@c6fc/spellcraft-aws-terraform";
+
+aws.providerAliases("us-east-2");
+
+// Returns:
+[{ aws: {
+	region: "us-east-2"
+}}, { aws: {
+	region: "us-east-1",
+			alias: "aws.us-east-1"
+}}, ...]
+```
+
+---
+
+<!-- SPELLCRAFT_DOCS_API_END -->
 
 
 ## Installation
@@ -59,26 +180,18 @@ Generate documentation with `npm run doc` to see more detailed information about
 Install the plugin as a dependency in your SpellCraft project:
 
 ```bash
-# Create a SpellCraft project if you haven't already
-npm install --save @c6fc/spellcraft
-
-# Install and expose this module with default name 'awsterraform'
-npx spellcraft importModule spellcraft-aws-terraform
+npm install --save @c6fc/spellcraft-aws-terraform
 ```
 
-Once installed, you can load the module into your JSonnet files by the name you specified with `importModule`, in this case 'awsterraform':
+Once installed, you can load the module into your JSonnet files.
 
 ```jsonnet
-local modules = import "modules";
+local aws = import "@c6fc/spellcraft-aws-terraform";
 
 {
-	'backend.tf.json': modules.awsterraform.bootstrapTerraformInAWS("myProjectName")
+	'backend.tf.json': aws.bootstrap("myProjectName"),
 	'provider.tf.json': {
-		provider: modules.awsterraform.providerAliases("us-west-2")
+		provider: aws.providerAliases("us-west-2")
 	}
 }
 ```
-
-## Documentation
-
-You can generate JSDoc documentation for this plugin using `npm run doc`. Documentation will be generated in the `doc` folder.

@@ -1,18 +1,9 @@
 'use strict';
 
-/**
- * @module spellcraft-aws-terraform-cli
- * @description This module represents the set of CLI commands and
- * shortcuts for using SpellCraft with AWS and Terraform together
- */
-
 process.env.AWS_SDK_JS_SUPPRESS_MAINTENANCE_MODE_MESSAGE=1
 
 const fs = require("fs");
 const os = require("os");
-const ini = require("ini");
-const path = require("path");
-const readline = require("readline");
 
 // Nab the authenticated AWS instantiation from aws-auth
 const awsauth = require("@c6fc/spellcraft-aws-auth");
@@ -24,37 +15,34 @@ const awsterraform = { projectName: false, bootstrapBucket: false, bootstrapLoca
 const remoteStates = {};
 
 exports._spellcraft_metadata = {
-	functionContext: { awsterraform },
-	init: async () => {
-		setAwsCredentials();
-	}
+	functionContext: { awsterraform }
 }
 
-exports.bootstrapTerraformInAWS = [async function (project) {
-	return await bootstrapTerraformInAWS(project);
+exports.bootstrap = [async function (project) {
+	return await bootstrap(project);
 }, "project"];
 
-exports.getTerraformInAWSArtifact = [async function (name) {
-	return await getTerraformInAWSArtifact(name);
+exports.getArtifact = [async function (name) {
+	return await getArtifact(name);
 }, "name"];
 
-exports.getTerraformInAWSBootstrapBucket = [async function () {
-	return await getTerraformInAWSBootstrapBucket();
+exports.getBootstrapBucket = [async function () {
+	return await getBootstrapBucket();
 }];
 
-exports.getTerraformInAWSRemoteState = [async function (project) {
-	return await getTerraformInAWSRemoteState(project);
+exports.getRemoteState = [async function (project) {
+	return await getRemoteState(project);
 }, "project"];
 
-exports.putTerraformInAWSArtifact = [async function (name, content) {
-	return await putTerraformInAWSArtifact(name, content);
+exports.putArtifact = [async function (name, content) {
+	return await putArtifact(name, content);
 }, "name", "content"];
 
-async function bootstrapTerraformInAWS(project) {
+async function bootstrap(project) {
 	const s3 = new aws.S3();
 	
 	let bucketName;
-	let bootstrapBucket = await getTerraformInAWSBootstrapBucket();
+	let bootstrapBucket = await getBootstrapBucket();
 
 	if (!bootstrapBucket) {
 		bucketName = `spellcraft-${Math.random().toString(36).replace(/[^a-z]+/g, '')}-${Math.round(Date.now() / 1000)}`;
@@ -149,7 +137,7 @@ async function bootstrapTerraformInAWS(project) {
 	}
 }
 
-async function getTerraformInAWSBootstrapBucket() {
+async function getBootstrapBucket() {
 
 	if (!!awsterraform.bootstrapBucket) {
 		return awsterraform.bootstrapBucket;
@@ -173,10 +161,10 @@ async function getTerraformInAWSBootstrapBucket() {
 	return false;
 }
 
-async function getTerraformInAWSRemoteState(project) {
+async function getRemoteState(project) {
 
 	if (!!!remoteStates[project]) {
-		await getTerraformInAWSBootstrapBucket();
+		await getBootstrapBucket();
 
 		const s3 = new aws.S3({ region: awsterraform.bootstrapBucketLocation });
 
@@ -227,10 +215,10 @@ async function getTerraformInAWSRemoteState(project) {
 	return resources;
 }
 
-async function getTerraformInAWSArtifact(name) {
+async function getArtifact(name) {
 
 	if (!!!artifacts[name]) {
-		await getTerraformInAWSBootstrapBucket();
+		await getBootstrapBucket();
 
 		const s3 = new aws.S3({ region: (awsterraform.bootstrapBucketLocation || 'us-east-1') });
 
@@ -245,10 +233,10 @@ async function getTerraformInAWSArtifact(name) {
 	return artifacts[name];
 }
 
-async function putTerraformInAWSArtifact(name, content) {
+async function putArtifact(name, content) {
 
 	if (!artifacts[name] !== content) {
-		await getTerraformInAWSBootstrapBucket();
+		await getBootstrapBucket();
 
 		const s3 = new aws.S3({ region: (awsterraform.bootstrapBucketLocation || 'us-east-1') });
 
