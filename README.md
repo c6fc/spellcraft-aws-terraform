@@ -19,7 +19,14 @@ This module exposes the concept of a bootstrap bucket (functionally a terraform 
 
 ## SpellFrame 'init()' features
 
-This plugin does not perform any distinct 'init' operations, other than to initialize credentials within the dependant plugin `@c6fc/terraform-aws-auth`.
+This plugin does not perform any distinct 'init' operations, other than to initialize credentials within the dependant plugin `@c6fc/spellcraft-aws-auth`.
+
+```jsonnet
+local aws = import "@c6fc/spellcraft-aws-terraform";
+
+# An instance of @c6fc/spellcraft-aws-auth
+aws.auth;
+```
 
 ## JavaScript context features
 

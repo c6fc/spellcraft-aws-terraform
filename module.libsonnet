@@ -1,9 +1,16 @@
 // Don't try to 'import' your spellcraft native functions here.
 // Use std.native(function)(..args) instead
 
+local auth = import "@c6fc/spellcraft-aws-auth/module.libsonnet";
+
 {
 	// JS Native functions are already documented in spellcraft_modules/foo.js
 	// but need to be specified here to expose them through the import
+
+	/**
+	 * Direct passthrough of the @c6fc/spellcraft-aws-auth
+	 */
+	auth: auth,
 
 	/**
 	 * Creates a Terraform backend bucket if one doesn't already exist, then
@@ -50,16 +57,16 @@
 
 	/**
 	 * Attempts to discover the bucket created through bootstrap(), returning the
-	 * bucket ARN if present.
+	 * bucket name if present, or false if no bootstrap bucket exists yet.
 	 *
-	 * @returns {string} bucketArn
+	 * @returns {string} bucketName
 	 * @example
 	 * local aws = import "@c6fc/spellcraft-aws-terraform";
 	 *
 	 * aws.getBootstrapBucket();
 	 *
 	 * // Returns:
-	 * arn:aws:s3:::spellcraft-random-0123456789
+	 * spellcraft-random-0123456789
 	 */
 	getBootstrapBucket():: std.native("@c6fc/spellcraft-aws-terraform:getBootstrapBucket")(),
 

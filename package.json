@@ -1,6 +1,6 @@
 {
   "name": "@c6fc/spellcraft-aws-terraform",
-  "version": "1.1.1",
+  "version": "2.0.0",
   "main": "module.js",
   "scripts": {
     "cli": "utils/cli-test.js",
@@ -22,16 +22,26 @@
     "url": "https://github.com/c6fc/spellcraft-aws-terraform/issues"
   },
   "homepage": "https://github.com/c6fc/spellcraft-aws-terraform#readme",
-  "description": "A plugin to empower @c6fc/spellcraft with AWS and Terraform",
+  "description": "S3 state backend, remote state lookups and artifact storage, including bootstrapping the bucket that holds them.",
   "dependencies": {
-    "@c6fc/spellcraft-aws-auth": "^1.1.2",
-    "@c6fc/spellcraft-terraform": "^1.1.3"
+    "@c6fc/spellcraft-aws-auth": "^2.0.0",
+    "@c6fc/spellcraft-terraform": "^2.0.0"
   },
   "devDependencies": {
-    "@c6fc/spellcraft": "~0.1.0",
+    "@c6fc/spellcraft": "^1.0.0",
     "yargs": "^18.0.0"
   },
   "peerDependencies": {
-    "@c6fc/spellcraft": "~0.1.0"
-  }
+    "@c6fc/spellcraft": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "module.js",
+    "module.libsonnet",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ]
 }

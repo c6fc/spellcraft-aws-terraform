@@ -108,7 +108,11 @@ async function bootstrap(project) {
 
 		console.log(`[+] Created bootstrap bucket ${bucketName}`);
 
-		bootstrapBucket = `arn:aws:s3:::${bucketName}`;
+		// Store the bare name, not an ARN. Every consumer (getArtifact,
+		// putArtifact, getRemoteState) passes this straight to S3 as `Bucket:`,
+		// which only accepts a name -- and the discovery path below already
+		// returns a name, so an ARN here made the two paths disagree.
+		bootstrapBucket = bucketName;
 	} else {
 		bucketName = bootstrapBucket;
 		console.log(`[+] Using bootstrap bucket ${bucketName}`);
@@ -151,6 +155,11 @@ async function getBootstrapBucket() {
 		.filter(e => /^spellcraft-[a-z]*?-\d{10}$/.test(e));
 
 	if (arns.length == 1) {
+		// Cache the discovery. Callers await this function for its side effect
+		// and then read awsterraform.bootstrapBucket; without this write that
+		// property stays unset unless bootstrap() ran in the same process.
+		awsterraform.bootstrapBucket = arns[0];
+
 		return arns[0];
 	}
 
@@ -166,14 +175,14 @@ async function getRemoteState(project) {
 	if (!!!remoteStates[project]) {
 		await getBootstrapBucket();
 
-		const s3 = new aws.S3({ region: awsterraform.bootstrapBucketLocation });
+		const s3 = new aws.S3({ region: awsterraform.bootstrapLocation });
 
 		let stateJson;
 
 		try {
 			stateJson = await s3.getObject({
 				Bucket: awsterraform.bootstrapBucket,
-				Key: `sonnetry/${project}/terraform.tfstate`
+				Key: `spellcraft/${project}/terraform.tfstate`
 			}).promise();
 
 		} catch(e) {
@@ -212,7 +221,9 @@ async function getRemoteState(project) {
 		remoteStates[project] = resources;
 	}
 
-	return resources;
+	// Read back through the cache. `resources` is block-scoped to the branch
+	// above, so returning it directly threw a ReferenceError on every call.
+	return remoteStates[project];
 }
 
 async function getArtifact(name) {
@@ -220,14 +231,25 @@ async function getArtifact(name) {
 	if (!!!artifacts[name]) {
 		await getBootstrapBucket();
 
-		const s3 = new aws.S3({ region: (awsterraform.bootstrapBucketLocation || 'us-east-1') });
+		const s3 = new aws.S3({ region: (awsterraform.bootstrapLocation || 'us-east-1') });
 
 		const object = await s3.getObject({
 			Bucket: awsterraform.bootstrapBucket,
-			Key: `sonnetry/${awsterraform.projectName}/artifacts/${name}`
+			Key: `spellcraft/${awsterraform.projectName}/artifacts/${name}`
 		}).promise();
 
-		artifacts[name] = object?.Body;
+		// putArtifact stores JSON, so decode it back into the value that was
+		// stored. Returning the raw Body handed Jsonnet a Buffer, which
+		// serialises as {"type":"Buffer","data":[...]} rather than the artifact
+		// -- and disagreed with the warm-cache path, which returns the original
+		// object. Fall back to the plain string for artifacts written by hand.
+		const body = object?.Body?.toString();
+
+		try {
+			artifacts[name] = JSON.parse(body);
+		} catch (e) {
+			artifacts[name] = body;
+		}
 	}
 
 	return artifacts[name];
@@ -235,15 +257,18 @@ async function getArtifact(name) {
 
 async function putArtifact(name, content) {
 
-	if (!artifacts[name] !== content) {
+	// Skip the write only when this exact content is already cached. The old
+	// guard was `!artifacts[name] !== content`, comparing a boolean to the
+	// content, which was always true.
+	if (artifacts[name] !== content) {
 		await getBootstrapBucket();
 
-		const s3 = new aws.S3({ region: (awsterraform.bootstrapBucketLocation || 'us-east-1') });
+		const s3 = new aws.S3({ region: (awsterraform.bootstrapLocation || 'us-east-1') });
 
 		const object = await s3.putObject({
-			Body: new Buffer.from(JSON.stringify(content)),
+			Body: Buffer.from(JSON.stringify(content)),
 			Bucket: awsterraform.bootstrapBucket,
-			Key: `sonnetry/${awsterraform.projectName}/artifacts/${name}`
+			Key: `spellcraft/${awsterraform.projectName}/artifacts/${name}`
 		}).promise();
 
 		artifacts[name] = content;
