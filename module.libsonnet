@@ -19,6 +19,25 @@ local auth = import "@c6fc/spellcraft-aws-auth/module.libsonnet";
 	 * use. State and artifacts for every project live in that one bucket, keyed
 	 * by project name.
 	 *
+	 * `getArtifact()` and `putArtifact()` key their object off the project name
+	 * this sets, so either one throws if it runs before this has. Jsonnet does
+	 * not guarantee that order on its own -- thread this function's result into
+	 * whatever calls them, the way `enableServices()` is threaded elsewhere in
+	 * this ecosystem, rather than merely calling both in the same manifest.
+	 *
+	 * A spell that only ever bootstraps one project, known ahead of time, can
+	 * skip calling this from Jsonnet at all: set `config.spellcraftProject` in
+	 * `package.json` and it runs during `init()`, before evaluation starts, so
+	 * there's no ordering hazard to think about. The two are mutually
+	 * exclusive -- calling this explicitly throws if `config.spellcraftProject`
+	 * already bootstrapped the spell, rather than letting the two silently
+	 * disagree about which project is live.
+	 *
+	 * A spell has one project. Calling this again with a *different* name in
+	 * the same process throws for the same reason -- to read another spell's
+	 * state, use `getRemoteState()`, not a second `bootstrap()` call. The
+	 * same name twice is a no-op.
+	 *
 	 * @param {string} project - names the state prefix; use one per spell
 	 * @returns {object} a Terraform block ready to merge into a `.tf.json` file
 	 * @example
@@ -48,12 +67,16 @@ local auth = import "@c6fc/spellcraft-aws-auth/module.libsonnet";
 	 * data source — the value is fetched while the manifest evaluates, so it can
 	 * shape the configuration rather than only appear in it.
 	 *
+	 * Throws if `bootstrap()` hasn't set a project name yet -- see `bootstrap()`
+	 * for why that ordering isn't automatic.
+	 *
 	 * @param {string} name - the artifact name given to `putArtifact()`
 	 * @returns {*} the stored value, parsed back from JSON
 	 * @example
 	 * local aws = import "@c6fc/spellcraft-aws-terraform/module.libsonnet";
 	 *
-	 * local shared = aws.getArtifact("network");
+	 * local backend = aws.bootstrap("my-project");
+	 * local shared = if backend != null then aws.getArtifact("network") else null;
 	 *
 	 * { "app.tf.json": { resource: { aws_instance: { app: { subnet_id: shared.subnetId } } } } }
 	 */
@@ -94,13 +117,21 @@ local auth = import "@c6fc/spellcraft-aws-auth/module.libsonnet";
 	 * Stores a value as a JSON artifact in the bootstrap bucket, under this
 	 * project's prefix. Read it back with `getArtifact()`.
 	 *
+	 * Throws if `bootstrap()` hasn't set a project name yet -- see `bootstrap()`
+	 * for why that ordering isn't automatic.
+	 *
 	 * @param {string} name - the artifact name
 	 * @param {*} content - any JSON-serialisable value
 	 * @returns {boolean} true
 	 * @example
 	 * local aws = import "@c6fc/spellcraft-aws-terraform/module.libsonnet";
 	 *
-	 * { "meta.json": { stored: aws.putArtifact("network", { subnetId: "subnet-abc123" }) } }
+	 * local backend = aws.bootstrap("my-project");
+	 *
+	 * {
+	 *     "backend.tf.json": backend,
+	 *     "meta.json": { stored: if backend != null then aws.putArtifact("network", { subnetId: "subnet-abc123" }) else null },
+	 * }
 	 */
 	putArtifact(name, content):: std.native("@c6fc/spellcraft-aws-terraform:putArtifact")(name, content),
 

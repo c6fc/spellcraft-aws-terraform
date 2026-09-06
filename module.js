@@ -4,6 +4,7 @@ process.env.AWS_SDK_JS_SUPPRESS_MAINTENANCE_MODE_MESSAGE=1
 
 const fs = require("fs");
 const os = require("os");
+const path = require("path");
 
 // Nab the authenticated AWS instantiation from aws-auth
 const awsauth = require("@c6fc/spellcraft-aws-auth");
@@ -14,11 +15,65 @@ const artifacts = {};
 const awsterraform = { projectName: false, bootstrapBucket: false, bootstrapLocation: false };
 const remoteStates = {};
 
+// Set during init() when config.spellcraftProject bootstraps automatically --
+// see the init hook below. Anything other than null here means the project
+// name came from config, not from a manifest's own bootstrap() call.
+let configuredProject = null;
+
 exports._spellcraft_metadata = {
-	functionContext: { awsterraform }
+	functionContext: { awsterraform },
+	init: async (spellframe) => {
+		const project = readConfiguredProject(spellframe);
+
+		if (project) {
+			configuredProject = project;
+			await bootstrap(project);
+		}
+	}
+}
+
+// Reads config.spellcraftProject from the *consumer's* package.json (the
+// same convention @c6fc/spellcraft-terraform uses for config.tf_version), so
+// a spell that only ever bootstraps one project can skip calling bootstrap()
+// from Jsonnet entirely. This runs during init() -- guaranteed to finish
+// before any Jsonnet evaluation starts -- so there's no laziness/ordering
+// hazard to navigate the way there is for a manifest-level bootstrap() call.
+function readConfiguredProject(spellframe) {
+	try {
+		const pkg = JSON.parse(fs.readFileSync(path.join(spellframe.baseDir, 'package.json'), 'utf-8'));
+		return pkg?.config?.spellcraftProject || null;
+	} catch (e) {
+		return null;
+	}
 }
 
 exports.bootstrap = [async function (project) {
+	// config.spellcraftProject and an explicit bootstrap() call are mutually
+	// exclusive, on purpose: allowing both risked the two silently disagreeing
+	// on which project a spell's state actually lives under. Pick one.
+	if (configuredProject !== null) {
+		throw new Error(
+			`[!] bootstrap("${project}") was called from the manifest, but config.spellcraftProject ` +
+			`("${configuredProject}") already bootstrapped this spell during init(). Remove this ` +
+			`bootstrap() call, or drop config.spellcraftProject from package.json and bootstrap ` +
+			`explicitly instead -- a spell can't be bootstrapped under two sources.`
+		);
+	}
+
+	// A second explicit bootstrap() call with a *different* name would move
+	// every later getArtifact()/putArtifact() call to a new namespace
+	// mid-manifest, silently. The same name twice is a harmless no-op --
+	// getBootstrapBucket()'s own cache makes that cheap -- but a spell has
+	// one project; reading another spell's state is what getRemoteState() is
+	// for, not a second bootstrap() call.
+	if (awsterraform.projectName !== false && awsterraform.projectName !== project) {
+		throw new Error(
+			`[!] bootstrap("${project}") conflicts with bootstrap("${awsterraform.projectName}"), already ` +
+			`called earlier in this process. A spell has one project -- use getRemoteState() to read ` +
+			`another spell's state instead of a second bootstrap() call.`
+		);
+	}
+
 	return await bootstrap(project);
 }, "project"];
 
@@ -226,7 +281,25 @@ async function getRemoteState(project) {
 	return remoteStates[project];
 }
 
+// Both artifact functions key their S3 object off `awsterraform.projectName`,
+// which only `bootstrap()` sets. Jsonnet's laziness means a manifest that
+// calls `bootstrap()` without threading its result into whatever calls
+// getArtifact/putArtifact can still evaluate this first -- and without this
+// guard, `projectName` was silently `false`, so the object landed at
+// `spellcraft/false/artifacts/<name>` instead of failing.
+function assertBootstrapped(fnName) {
+	if (!awsterraform.projectName) {
+		throw new Error(
+			`[!] ${fnName}() was called before bootstrap() set a project name. ` +
+			`Call aws.bootstrap(project) first, and thread its return value into ` +
+			`whatever calls ${fnName}() so evaluation order is forced -- Jsonnet ` +
+			`does not otherwise guarantee bootstrap() runs first.`
+		);
+	}
+}
+
 async function getArtifact(name) {
+	assertBootstrapped('getArtifact');
 
 	if (!!!artifacts[name]) {
 		await getBootstrapBucket();
@@ -256,6 +329,7 @@ async function getArtifact(name) {
 }
 
 async function putArtifact(name, content) {
+	assertBootstrapped('putArtifact');
 
 	// Skip the write only when this exact content is already cached. The old
 	// guard was `!artifacts[name] !== content`, comparing a boolean to the

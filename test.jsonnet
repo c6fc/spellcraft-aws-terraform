@@ -6,12 +6,18 @@
 
 local aws = import "module.libsonnet";
 
+// putArtifact() keys its object off the project name bootstrap() sets, and
+// Jsonnet doesn't guarantee bootstrap() runs first just because it's written
+// first -- binding it to a local and depending on that value (below) is what
+// actually forces the order.
+local bootstrap = aws.bootstrap("spellcraft-aws-terraform-module-test");
+
 {
-	"bootstrap.tf.json": aws.bootstrap("spellcraft-aws-terraform-module-test"),
+	"bootstrap.tf.json": bootstrap,
 	"test.tf.json": {
 		output: {
 			putArtifact: {
-				value: aws.putArtifact("putArtifactTest", "mytest2")
+				value: if bootstrap != null then aws.putArtifact("putArtifactTest", "mytest2") else null
 			},
 			getBootstrapBucket: {
 				value: aws.getBootstrapBucket()
