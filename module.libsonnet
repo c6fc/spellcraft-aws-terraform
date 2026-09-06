@@ -1,125 +1,135 @@
-// Don't try to 'import' your spellcraft native functions here.
-// Use std.native(function)(..args) instead
+// The Jsonnet face of this plugin. Native functions from module.js are reached
+// through std.native(), namespaced by package name; everything else here is
+// ordinary Jsonnet built on top of them.
+//
+// Doc comments below are lifted into README.md by `npx spellcraft doc`.
 
 local auth = import "@c6fc/spellcraft-aws-auth/module.libsonnet";
 
 {
-	// JS Native functions are already documented in spellcraft_modules/foo.js
-	// but need to be specified here to expose them through the import
-
-	/**
-	 * Direct passthrough of the @c6fc/spellcraft-aws-auth
-	 */
+	// Passthrough of @c6fc/spellcraft-aws-auth, so a spell that imports this
+	// module can reach `aws.auth.getCallerIdentity()` without a second import.
 	auth: auth,
 
 	/**
-	 * Creates a Terraform backend bucket if one doesn't already exist, then
-	 * returns a 'backend' object referencing this bucket and a unique path
-	 * for this project's state and artifacts.
+	 * Prepares the S3 backend for a project, creating the bootstrap bucket if it
+	 * does not exist yet, and returns the Terraform `backend` block for it.
 	 *
-	 * @param {string} project
-	 * @returns {object} backend
+	 * This is the one function here that writes: it creates the bucket on first
+	 * use. State and artifacts for every project live in that one bucket, keyed
+	 * by project name.
+	 *
+	 * @param {string} project - names the state prefix; use one per spell
+	 * @returns {object} a Terraform block ready to merge into a `.tf.json` file
 	 * @example
-	 * local aws = import "@c6fc/spellcraft-aws-terraform";
+	 * local aws = import "@c6fc/spellcraft-aws-terraform/module.libsonnet";
 	 *
-	 * aws.bootstrap("myBootstrapTest");
+	 * { "backend.tf.json": aws.bootstrap("my-project") }
 	 *
 	 * // Returns:
-	 * {
-	 *    "terraform": {
-	 *        "backend": {
-	 *            "s3": {
-	 *                "bucket": "spellcraft-random-0123456789",
-	 *                "key": "spellcraft/myBootstrapTest/terraform.tfstate",
-	 *                "region": "us-east-1"
-	 *            }
-	 *        }
-	 *    }
-	 * }
+	 * // {
+	 * //   "terraform": {
+	 * //     "backend": {
+	 * //       "s3": {
+	 * //         "bucket": "spellcraft-random-0123456789",
+	 * //         "key": "spellcraft/my-project/terraform.tfstate",
+	 * //         "region": "us-east-1"
+	 * //       }
+	 * //     }
+	 * //   }
+	 * // }
 	 */
 	bootstrap(project):: std.native("@c6fc/spellcraft-aws-terraform:bootstrap")(project),
 
 	/**
-	 * Obtains the contents of a named artifact stored alongside this project in the bootstrap
-	 * bucket. This artifact is created with 'putArtifact';
+	 * Reads an artifact previously stored by `putArtifact()`.
 	 *
-	 * @param {string} name
-	 * @returns {object} backend
+	 * Artifacts are how one spell hands a value to another without a Terraform
+	 * data source — the value is fetched while the manifest evaluates, so it can
+	 * shape the configuration rather than only appear in it.
+	 *
+	 * @param {string} name - the artifact name given to `putArtifact()`
+	 * @returns {*} the stored value, parsed back from JSON
 	 * @example
-	 * local aws = import "@c6fc/spellcraft-aws-terraform";
+	 * local aws = import "@c6fc/spellcraft-aws-terraform/module.libsonnet";
 	 *
-	 * aws.getArtifact("myArtifact");
+	 * local shared = aws.getArtifact("network");
 	 *
-	 * // Returns:
-	 * <contents of your artifact>
+	 * { "app.tf.json": { resource: { aws_instance: { app: { subnet_id: shared.subnetId } } } } }
 	 */
 	getArtifact(name):: std.native("@c6fc/spellcraft-aws-terraform:getArtifact")(name),
 
 	/**
-	 * Attempts to discover the bucket created through bootstrap(), returning the
-	 * bucket name if present, or false if no bootstrap bucket exists yet.
+	 * The name of the bootstrap bucket, or `false` when none exists yet.
 	 *
-	 * @returns {string} bucketName
+	 * Discovery is by naming convention rather than by tag, and more than one
+	 * match in the account is an error — there is meant to be exactly one.
+	 *
+	 * @returns {string|boolean} the bucket name, or false
 	 * @example
-	 * local aws = import "@c6fc/spellcraft-aws-terraform";
+	 * local aws = import "@c6fc/spellcraft-aws-terraform/module.libsonnet";
 	 *
-	 * aws.getBootstrapBucket();
-	 *
-	 * // Returns:
-	 * spellcraft-random-0123456789
+	 * { "state.json": { bucket: aws.getBootstrapBucket() } }
 	 */
 	getBootstrapBucket():: std.native("@c6fc/spellcraft-aws-terraform:getBootstrapBucket")(),
 
 	/**
-	 * Read the Terraform state for an adjacent SpellCraft project in the same AWS account
+	 * Reads the Terraform state of another SpellCraft project in the same account.
 	 *
-	 * @param {string} project
-	 * @returns {object} state
+	 * Use it to consume another spell's outputs at evaluation time. The project
+	 * name is the one passed to that spell's `bootstrap()`.
+	 *
+	 * @param {string} project - the other spell's project name
+	 * @returns {object} that project's Terraform state
 	 * @example
-	 * local aws = import "@c6fc/spellcraft-aws-terraform";
+	 * local aws = import "@c6fc/spellcraft-aws-terraform/module.libsonnet";
 	 *
-	 * aws.getRemoteState("mySecondProject");
+	 * local network = aws.getRemoteState("network");
 	 *
-	 * // Returns:
-	 * { full remote state object }
+	 * { "app.tf.json": { output: { vpc: { value: network.outputs.vpc_id.value } } } }
 	 */
 	getRemoteState(project):: std.native("@c6fc/spellcraft-aws-terraform:getRemoteState")(project),
 
 	/**
-	 * Stores the JSON-encoded balue of 'contents' as a file in the S3 backend bucket using
-	 * the project prefix.
+	 * Stores a value as a JSON artifact in the bootstrap bucket, under this
+	 * project's prefix. Read it back with `getArtifact()`.
 	 *
-	 * @param {string} name
-	 * @param {*} contents
+	 * @param {string} name - the artifact name
+	 * @param {*} content - any JSON-serialisable value
 	 * @returns {boolean} true
 	 * @example
-	 * local aws = import "@c6fc/spellcraft-aws-terraform";
+	 * local aws = import "@c6fc/spellcraft-aws-terraform/module.libsonnet";
 	 *
-	 * aws.putArtifact("myArtifact", { someData: someValue });
-	 *
-	 * // Returns:
-	 * true
+	 * { "meta.json": { stored: aws.putArtifact("network", { subnetId: "subnet-abc123" }) } }
 	 */
 	putArtifact(name, content):: std.native("@c6fc/spellcraft-aws-terraform:putArtifact")(name, content),
 
 	/**
-	 * Stores the JSON-encoded balue of 'contents' as a file in the S3 backend bucket using
-	 * the project prefix.
+	 * Builds the full set of AWS provider declarations for a spell.
 	 *
-	 * @param {string} default
-	 * @returns {object} terraformProviderConfig
+	 * Returns one aliased provider per region your credentials can see — the
+	 * alias is the region name, so resources bind to it as `aws.us-west-2` — plus
+	 * an unaliased default provider for the region you name. This is what lets
+	 * plugins like `@c6fc/spellcraft-aws-s3` take a region as an argument and
+	 * place resources in it without every spell wiring providers by hand.
+	 *
+	 * The region list comes from a live `describeRegions` call, so the set
+	 * reflects what the account actually has enabled.
+	 *
+	 * @param {string} default - region for the unaliased default provider
+	 * @returns {object[]} provider declarations, for the `provider` key of a `.tf.json`
 	 * @example
-	 * local aws = import "@c6fc/spellcraft-aws-terraform";
+	 * local aws = import "@c6fc/spellcraft-aws-terraform/module.libsonnet";
 	 *
-	 * aws.providerAliases("us-east-2");
+	 * { "providers.tf.json": { provider: aws.providerAliases("us-east-2") } }
 	 *
 	 * // Returns:
-	 * [{ aws: {
-	 *		region: "us-east-2"
-	 * }}, { aws: {
-	 *		region: "us-east-1",
-			alias: "aws.us-east-1"
-	 * }}, ...]
+	 * // [
+	 * //   { "aws": { "alias": "us-east-1", "region": "us-east-1" } },
+	 * //   { "aws": { "alias": "us-west-2", "region": "us-west-2" } },
+	 * //   ...
+	 * //   { "aws": { "region": "us-east-2" } }
+	 * // ]
 	 */
 	providerAliases(default):: [{
 		aws: {
@@ -134,5 +144,4 @@ local auth = import "@c6fc/spellcraft-aws-auth/module.libsonnet";
 			region: default
 		}
 	}]
-
 }
